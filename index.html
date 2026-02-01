@@ -4,8 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DZI Viewer - OpenSeadragon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js"></script>
     <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #ec4899;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --surface-light: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --border-radius: 16px;
+            --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,218 +34,684 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--background);
+            min-height: 100vh;
+            color: var(--text);
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        .app-container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--surface);
+            border-right: 1px solid var(--surface-light);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            overflow-y: auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Steps */
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: var(--surface-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .step.completed .step-number {
+            background: var(--success);
+            color: white;
+        }
+
+        .step.active .step-number {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.3);
+        }
+
+        .step-content h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .step-content p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Upload Zones */
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--surface-light);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
             overflow: hidden;
         }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
         }
 
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+        .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            transform: scale(1.02);
         }
 
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+        .upload-zone.success {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
         }
 
-        .controls {
-            padding: 30px;
-            border-bottom: 1px solid #e0e0e0;
+        .upload-zone input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
         }
 
-        .file-input-wrapper {
-            margin-bottom: 20px;
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--surface-light);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            font-size: 24px;
+            transition: all 0.3s ease;
         }
 
-        .file-input-wrapper label {
-            display: block;
+        .upload-zone:hover .upload-icon {
+            background: var(--primary);
+            transform: scale(1.1);
+        }
+
+        .upload-zone.success .upload-icon {
+            background: var(--success);
+        }
+
+        .upload-zone h4 {
+            font-size: 0.875rem;
             font-weight: 600;
-            margin-bottom: 10px;
-            color: #333;
+            margin-bottom: 4px;
         }
 
-        .file-input-wrapper input {
-            display: block;
+        .upload-zone p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .upload-status {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .upload-status.loading {
+            display: flex;
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--info);
+        }
+
+        .upload-status.success {
+            display: flex;
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .upload-status.error {
+            display: flex;
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--error);
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Load Button */
+        .load-button {
             width: 100%;
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            border-radius: 4px;
-            font-size: 1em;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            border-radius: var(--border-radius);
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
 
-        .instructions {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
+        .load-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.5);
         }
 
-        .instructions h3 {
-            color: #667eea;
-            margin-bottom: 10px;
+        .load-button:active:not(:disabled) {
+            transform: translateY(0);
         }
 
-        .instructions ol {
-            margin-left: 20px;
-            line-height: 1.8;
+        .load-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .instructions li {
+        .load-button .icon {
+            font-size: 1.25rem;
+        }
+
+        /* Info Card */
+        .info-card {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .info-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-bottom: 8px;
         }
 
-        .alert {
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            display: none;
+        .info-card-header span {
+            font-size: 1rem;
         }
 
-        .alert.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+        .info-card-header h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--warning);
         }
 
-        .alert.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        .info-card ul {
+            list-style: none;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
 
-        .alert.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .info-card li {
+            padding: 4px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .info-card li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--warning);
+        }
+
+        /* Main Viewer Area */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            background: var(--background);
+        }
+
+        .viewer-header {
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--surface-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .viewer-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .viewer-title h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge.ready {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .badge.waiting {
+            background: rgba(148, 163, 184, 0.2);
+            color: var(--text-muted);
+        }
+
+        .viewer-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .control-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--surface-light);
+            background: var(--surface);
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:hover {
+            background: var(--surface-light);
+            color: var(--text);
+        }
+
+        /* Viewer */
+        .viewer-wrapper {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #openseadragon-viewer {
-            width: 100%;
-            height: 700px;
-            background: #000;
-            display: none;
+            position: absolute;
+            inset: 0;
+            background: var(--background);
         }
 
-        .viewer-container {
-            padding: 30px;
+        .empty-state {
+            text-align: center;
+            padding: 60px 40px;
         }
 
-        .note {
-            margin-top: 20px;
-            padding: 15px;
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 4px;
-            color: #856404;
+        .empty-state-icon {
+            width: 120px;
+            height: 120px;
+            background: var(--surface);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 48px;
         }
 
-        .note strong {
-            display: block;
-            margin-bottom: 5px;
+        .empty-state h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 8px;
         }
 
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .empty-state p {
+            color: var(--text-muted);
+            max-width: 400px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            padding: 16px 20px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 320px;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            background: var(--success);
             color: white;
+        }
+
+        .toast.error {
+            background: var(--error);
+            color: white;
+        }
+
+        .toast.info {
+            background: var(--info);
+            color: white;
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+        }
+
+        .toast-message {
+            flex: 1;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .toast-close {
+            background: none;
             border: none;
-            padding: 12px 30px;
-            border-radius: 4px;
-            font-size: 1em;
+            color: inherit;
+            opacity: 0.7;
             cursor: pointer;
-            transition: transform 0.2s;
+            font-size: 1.25rem;
+            padding: 4px;
         }
 
-        button:hover {
-            transform: translateY(-2px);
+        .toast-close:hover {
+            opacity: 1;
         }
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid var(--surface-light);
+            }
+
+            .viewer-wrapper {
+                min-height: 500px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🔍 DZI Image Viewer</h1>
-            <p>View Deep Zoom Images locally without a server</p>
-        </div>
-
-        <div class="controls">
-            <div class="instructions">
-                <h3>📋 How to Use:</h3>
-                <ol>
-                    <li>Select your <strong>.dzi</strong> file using the file input below</li>
-                    <li>Select the corresponding <strong>_files</strong> folder (the folder containing all the tile images)</li>
-                    <li>Click "Load DZI Image" to view your image</li>
-                </ol>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🔍</div>
+                <div class="logo-text">
+                    <h1>DZI Viewer</h1>
+                    <p>Deep Zoom Image Viewer</p>
+                </div>
             </div>
 
-            <div class="alert" id="alertBox"></div>
-
-            <div class="file-input-wrapper">
-                <label for="dziFile">Select DZI File (.dzi):</label>
-                <input type="file" id="dziFile" accept=".dzi,.xml" />
+            <div class="steps">
+                <div class="step active" id="step1">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Select DZI File</h3>
+                        <p>Choose your .dzi metadata file</p>
+                    </div>
+                </div>
+                <div class="step" id="step2">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Select Tiles Folder</h3>
+                        <p>Choose the _files folder with tiles</p>
+                    </div>
+                </div>
+                <div class="step" id="step3">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>View Image</h3>
+                        <p>Explore your deep zoom image</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="file-input-wrapper">
-                <label for="dziFolder">Select Image Tiles Folder (_files folder):</label>
-                <input type="file" id="dziFolder" webkitdirectory directory multiple />
+            <div class="upload-section">
+                <div class="upload-zone" id="dziFileZone">
+                    <input type="file" id="dziFile" accept=".dzi,.xml" />
+                    <div class="upload-icon">📄</div>
+                    <h4>DZI File</h4>
+                    <p>Click or drag .dzi file here</p>
+                    <div class="upload-status" id="dziFileStatus"></div>
+                </div>
+
+                <div class="upload-zone" id="dziFolderZone">
+                    <input type="file" id="dziFolder" webkitdirectory directory multiple />
+                    <div class="upload-icon">📁</div>
+                    <h4>Tiles Folder</h4>
+                    <p>Click to select _files folder</p>
+                    <div class="upload-status" id="dziFolderStatus"></div>
+                </div>
             </div>
 
-            <button id="loadButton" onclick="loadDZI()">Load DZI Image</button>
+            <button class="load-button" id="loadButton" onclick="loadDZI()">
+                <span class="icon">🚀</span>
+                Load DZI Image
+            </button>
 
-            <div class="note">
-                <strong>⚠️ Important Notes:</strong>
-                <ul style="margin-left: 20px; margin-top: 10px;">
-                    <li>For best results, open this HTML file directly in your browser (file:// protocol)</li>
-                    <li>Your DZI folder structure should be: yourimage.dzi + yourimage_files/ folder</li>
-                    <li>Modern browsers (Chrome, Edge, Firefox) support local file access without CORS issues</li>
+            <div class="info-card">
+                <div class="info-card-header">
+                    <span>💡</span>
+                    <h4>Tips</h4>
+                </div>
+                <ul>
+                    <li>Download and open locally for best results</li>
+                    <li>Structure: image.dzi + image_files/</li>
+                    <li>Use mouse wheel to zoom, drag to pan</li>
                 </ul>
             </div>
-        </div>
+        </aside>
 
-        <div class="viewer-container">
-            <div id="openseadragon-viewer"></div>
-        </div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="viewer-header">
+                <div class="viewer-title">
+                    <h2>Image Viewer</h2>
+                    <span class="badge waiting" id="statusBadge">Waiting for files</span>
+                </div>
+            </header>
+
+            <div class="viewer-wrapper">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-state-icon">🖼️</div>
+                    <h3>No Image Loaded</h3>
+                    <p>Select a DZI file and its corresponding tiles folder from the sidebar, then click "Load DZI Image" to view.</p>
+                </div>
+                <div id="openseadragon-viewer"></div>
+            </div>
+        </main>
     </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
         let viewer = null;
         let dziFileContent = null;
         let tileFiles = {};
-        let currentTileSource = null; // Track current tile source for cleanup
+        let currentTileSource = null;
 
-        // Show alert message
-        function showAlert(message, type = 'info') {
-            const alertBox = document.getElementById('alertBox');
-            alertBox.textContent = message;
-            alertBox.className = 'alert ' + type;
-            alertBox.style.display = 'block';
+        // Toast notification system
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: '✓',
+                error: '✗',
+                info: 'ℹ'
+            };
+            
+            toast.innerHTML = `
+                <span class="toast-icon">${icons[type]}</span>
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
         }
 
-        // Hide alert message
-        function hideAlert() {
-            const alertBox = document.getElementById('alertBox');
-            alertBox.style.display = 'none';
+        // Update step states
+        function updateSteps(completedSteps) {
+            for (let i = 1; i <= 3; i++) {
+                const step = document.getElementById(`step${i}`);
+                step.classList.remove('completed', 'active');
+                
+                if (completedSteps.includes(i)) {
+                    step.classList.add('completed');
+                } else if (i === Math.max(...completedSteps) + 1 || (completedSteps.length === 0 && i === 1)) {
+                    step.classList.add('active');
+                }
+            }
+        }
+
+        // Update status badge
+        function updateStatusBadge() {
+            const badge = document.getElementById('statusBadge');
+            if (dziFileContent && Object.keys(tileFiles).length > 0) {
+                badge.textContent = 'Ready to load';
+                badge.className = 'badge ready';
+            } else {
+                badge.textContent = 'Waiting for files';
+                badge.className = 'badge waiting';
+            }
+        }
+
+        // Helper function to update upload status
+        function updateStatus(elementId, state, message) {
+            const statusEl = document.getElementById(elementId);
+            statusEl.className = 'upload-status ' + state;
+            
+            if (state === 'loading') {
+                statusEl.innerHTML = `<div class="spinner"></div><span>${message}</span>`;
+            } else if (state === 'success') {
+                statusEl.innerHTML = `<span>✓</span><span>${message}</span>`;
+            } else if (state === 'error') {
+                statusEl.innerHTML = `<span>✗</span><span>${message}</span>`;
+            }
+        }
+
+        // Update upload zone visual state
+        function updateZoneState(zoneId, state) {
+            const zone = document.getElementById(zoneId);
+            zone.classList.remove('success', 'error');
+            if (state) zone.classList.add(state);
         }
 
         // Read DZI file
@@ -232,46 +719,81 @@
             const file = e.target.files[0];
             if (file) {
                 try {
+                    updateStatus('dziFileStatus', 'loading', 'Reading file...');
                     dziFileContent = await file.text();
-                    showAlert('✓ DZI file loaded successfully', 'success');
+                    updateStatus('dziFileStatus', 'success', file.name);
+                    updateZoneState('dziFileZone', 'success');
+                    
+                    const completedSteps = [1];
+                    if (Object.keys(tileFiles).length > 0) completedSteps.push(2);
+                    updateSteps(completedSteps);
+                    updateStatusBadge();
+                    
                     console.log('DZI file loaded:', file.name);
                 } catch (error) {
-                    showAlert('Error reading DZI file: ' + error.message, 'error');
-                    console.error('Error reading DZI file:', error);
+                    updateStatus('dziFileStatus', 'error', 'Error: ' + error.message);
+                    updateZoneState('dziFileZone', 'error');
+                    showToast('Failed to read DZI file', 'error');
                 }
             }
         });
 
         // Read tiles folder
-        document.getElementById('dziFolder').addEventListener('change', function(e) {
+        document.getElementById('dziFolder').addEventListener('change', async function(e) {
             const files = e.target.files;
             tileFiles = {};
             
             if (files.length > 0) {
+                updateStatus('dziFolderStatus', 'loading', `Processing ${files.length} files...`);
+                
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const path = file.webkitRelativePath || file.name;
                     tileFiles[path] = file;
                 }
-                showAlert(`✓ Loaded ${files.length} tile files from folder`, 'success');
+                
+                updateStatus('dziFolderStatus', 'success', `${files.length} tiles loaded`);
+                updateZoneState('dziFolderZone', 'success');
+                
+                const completedSteps = [];
+                if (dziFileContent) completedSteps.push(1);
+                completedSteps.push(2);
+                updateSteps(completedSteps);
+                updateStatusBadge();
+                
                 console.log('Tile files loaded:', Object.keys(tileFiles).length);
             }
         });
 
+        // Drag and drop handlers
+        ['dziFileZone', 'dziFolderZone'].forEach(id => {
+            const zone = document.getElementById(id);
+            
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+            
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+            
+            zone.addEventListener('drop', () => {
+                zone.classList.remove('dragover');
+            });
+        });
+
         // Load and display DZI
         async function loadDZI() {
-            hideAlert();
-
-            // Check if OpenSeadragon is loaded
             if (typeof OpenSeadragon === 'undefined') {
-                showAlert('OpenSeadragon library is not loaded. Please check your internet connection and refresh the page.', 'error');
+                showToast('OpenSeadragon library not loaded. Check internet connection.', 'error');
                 return;
             }
 
-            // Custom tile source that loads from File objects
             class LocalFileTileSource extends OpenSeadragon.TileSource {
                 constructor(dziXml, tileFilesMap, baseFolder) {
-                    // Parse DZI XML first to get dimensions
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(dziXml, 'text/xml');
                     
@@ -285,17 +807,14 @@
                     const width = parseInt(size.getAttribute('Width'));
                     const height = parseInt(size.getAttribute('Height'));
                     
-                    // Calculate max level
                     const maxLevel = Math.ceil(Math.log2(Math.max(width, height)));
-                    const minLevel = 0;
 
-                    // Call parent constructor with proper options
                     super({
                         width: width,
                         height: height,
                         tileSize: tileSize,
                         tileOverlap: tileOverlap,
-                        minLevel: minLevel,
+                        minLevel: 0,
                         maxLevel: maxLevel
                     });
 
@@ -307,11 +826,8 @@
                 }
 
                 getTileUrl(level, x, y) {
-                    // Build the expected path for the tile
-                    // Format: folder_files/level/x_y.format
                     const tilePath = `${this.baseFolder}_files/${level}/${x}_${y}.${this.format}`;
                     
-                    // Try different path variations to find the file
                     let matchingKey = null;
                     for (let key in this.tileFilesMap) {
                         if (key.endsWith(`/${level}/${x}_${y}.${this.format}`) || 
@@ -324,7 +840,6 @@
                     }
 
                     if (matchingKey && !this.tileUrls[tilePath]) {
-                        // Create a blob URL for this file
                         const file = this.tileFilesMap[matchingKey];
                         this.tileUrls[tilePath] = URL.createObjectURL(file);
                     }
@@ -332,11 +847,8 @@
                     return this.tileUrls[tilePath] || '';
                 }
 
-                configure(data) {
-                    return data;
-                }
+                configure(data) { return data; }
 
-                // Cleanup method to revoke blob URLs
                 cleanup() {
                     for (let url in this.tileUrls) {
                         URL.revokeObjectURL(this.tileUrls[url]);
@@ -346,50 +858,39 @@
             }
 
             if (!dziFileContent) {
-                showAlert('Please select a DZI file first', 'error');
+                showToast('Please select a DZI file first', 'error');
                 return;
             }
 
             if (Object.keys(tileFiles).length === 0) {
-                showAlert('Please select the tiles folder (_files folder)', 'error');
+                showToast('Please select the tiles folder', 'error');
                 return;
             }
 
             try {
-                showAlert('Loading DZI image...', 'info');
+                showToast('Loading DZI image...', 'info');
 
-                // Get the base folder name from the first tile file path
                 const firstTilePath = Object.keys(tileFiles)[0];
                 const pathParts = firstTilePath.split(/[\/\\]/);
                 let baseFolder = pathParts[0];
                 
-                // Remove '_files' suffix if it exists at the end
                 if (baseFolder.endsWith('_files')) {
-                    baseFolder = baseFolder.slice(0, -6); // Remove last 6 characters ('_files')
+                    baseFolder = baseFolder.slice(0, -6);
                 }
 
-                console.log('Base folder:', baseFolder);
-                console.log('Sample tile paths:', Object.keys(tileFiles).slice(0, 5));
-
-                // Create custom tile source
                 const tileSource = new LocalFileTileSource(dziFileContent, tileFiles, baseFolder);
 
-                // Destroy existing viewer and cleanup old tile source if any
-                if (currentTileSource && typeof currentTileSource.cleanup === 'function') {
-                    currentTileSource.cleanup();
-                }
+                if (currentTileSource?.cleanup) currentTileSource.cleanup();
                 if (viewer) {
                     viewer.destroy();
                     viewer = null;
                 }
                 
-                // Store the new tile source for future cleanup
                 currentTileSource = tileSource;
 
-                // Show viewer container
+                document.getElementById('emptyState').style.display = 'none';
                 document.getElementById('openseadragon-viewer').style.display = 'block';
 
-                // Create OpenSeadragon viewer
                 viewer = OpenSeadragon({
                     id: 'openseadragon-viewer',
                     prefixUrl: 'https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/images/',
@@ -408,36 +909,31 @@
                 });
 
                 viewer.addHandler('open', function() {
-                    showAlert('✓ DZI image loaded successfully! Use mouse wheel to zoom, drag to pan', 'success');
-                    console.log('Viewer opened successfully');
+                    showToast('Image loaded successfully!', 'success');
+                    updateSteps([1, 2, 3]);
+                    
+                    const badge = document.getElementById('statusBadge');
+                    badge.textContent = 'Viewing';
+                    badge.className = 'badge ready';
                 });
 
                 viewer.addHandler('open-failed', function(event) {
-                    showAlert('Failed to open DZI image: ' + (event.message || 'Unknown error'), 'error');
-                    console.error('Viewer open failed:', event);
-                });
-
-                viewer.addHandler('tile-load-failed', function(event) {
-                    console.warn('Tile load failed:', event.tile);
+                    showToast('Failed to open image: ' + (event.message || 'Unknown error'), 'error');
                 });
 
             } catch (error) {
-                showAlert('Error loading DZI: ' + error.message, 'error');
+                showToast('Error: ' + error.message, 'error');
                 console.error('Error loading DZI:', error);
             }
         }
 
-        // Cleanup blob URLs when page unloads
         window.addEventListener('beforeunload', function() {
-            if (currentTileSource && typeof currentTileSource.cleanup === 'function') {
-                currentTileSource.cleanup();
-            }
+            if (currentTileSource?.cleanup) currentTileSource.cleanup();
         });
 
-        // Check if OpenSeadragon loaded successfully on page load
         window.addEventListener('load', function() {
             if (typeof OpenSeadragon === 'undefined') {
-                showAlert('⚠️ OpenSeadragon library failed to load. Please ensure you have internet connectivity to load the library from CDN.', 'error');
+                showToast('OpenSeadragon failed to load. Check internet connection.', 'error');
                 document.getElementById('loadButton').disabled = true;
             }
         });
