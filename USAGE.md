@@ -33,28 +33,106 @@ my-image_files/
 
 ### Creating DZI Files
 
-If you don't have DZI files yet, you can create them using various tools:
+We provide interactive scripts that guide you through converting images (SVS, JPG, PNG, TIFF, etc.) to DZI format.
 
-#### Using Python (with PIL/Pillow)
-```python
-from PIL import Image
-import os
+---
 
-def create_dzi(image_path, output_path):
-    # Use a DZI generator library like pyvips or deepzoom
-    pass
+#### 🍎 macOS / Linux
+
+1. **Download the script**: [`convert_to_dzi.sh`](scripts/convert_to_dzi.sh)
+
+2. **Save it** to a convenient location (e.g., your Downloads folder)
+
+3. **Open Terminal** and run:
+   ```bash
+   # Navigate to where you saved the script
+   cd ~/Downloads
+   
+   # Make it executable (only needed once)
+   chmod +x convert_to_dzi.sh
+   
+   # Run the script
+   ./convert_to_dzi.sh
+   ```
+
+4. **Follow the prompts** — the script will:
+   - Check if VIPS is installed (and help you install it if needed)
+   - Ask for your input folder (where your images are)
+   - Ask for your output folder (where DZI files will be saved)
+   - Let you choose file types and quality settings
+   - Convert all matching files with progress updates
+
+---
+
+#### 🪟 Windows
+
+1. **Download the script**: [`convert_to_dzi.ps1`](scripts/convert_to_dzi.ps1)
+
+2. **Save it** to a convenient location (e.g., your Downloads folder)
+
+3. **Open PowerShell** and run:
+   ```powershell
+   # Navigate to where you saved the script
+   cd $HOME\Downloads
+   
+   # Allow script execution (only needed once, run as Administrator)
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   
+   # Run the script
+   .\convert_to_dzi.ps1
+   ```
+
+4. **Follow the prompts** — same interactive experience as the macOS/Linux script
+
+---
+
+#### Example Session
+
+```
+🦜 DZI Converter - Interactive Script
+=====================================
+
+🔍 Checking dependencies...
+   ✅ vips found: vips-8.15.0
+   ✅ OpenSlide support: available
+
+📁 Enter input directory (containing slides):
+   > ~/Slides
+
+📁 Enter output directory (for DZI files):
+   > ~/Desktop/dzi_output
+
+📂 Select file types to convert:
+   [1] SVS files only (.svs)
+   [2] All pathology formats (.svs, .ndpi, .mrxs, .scn, .vms, .bif)
+   [3] Standard images (.jpg, .jpeg, .png, .tif, .tiff)
+   [4] Custom extension
+   > 1
+
+🎨 Select quality setting:
+   [1] Lossless (PNG tiles, largest files)
+   [2] High quality (Q=95, recommended for diagnostic use)
+   [3] Balanced (Q=85, good quality, moderate size)
+   [4] Web-optimized (Q=75, smallest files)
+   > 2
+
+🔬 Converting: biopsy_001.svs
+   📐 Dimensions: 45,000 x 32,000 pixels
+   ✅ Success! (12 zoom levels, 8,432 tiles)
+
+🎉 Conversion complete!
+   ✅ Converted: 5 files
+   ❌ Errors: 0 files
+   📁 Output: ~/Desktop/dzi_output
 ```
 
-#### Using VIPS
-```bash
-vips dzsave input.jpg output
-# This creates output.dzi and output_files/
-```
+---
 
-#### Using ImageMagick
-```bash
-convert input.jpg -define dzi:tile-size=256 output.dzi
-```
+#### Supported File Formats
+
+The scripts support these formats:
+- **Pathology slides**: `.svs`, `.ndpi`, `.mrxs`, `.scn`, `.vms`, `.bif`
+- **Standard images**: `.jpg`, `.jpeg`, `.png`, `.tif`, `.tiff`
 
 ## Viewer Controls
 
