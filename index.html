@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DZI Viewer - OpenSeadragon</title>
+    <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .file-input-wrapper {
+            margin-bottom: 20px;
+        }
+
+        .file-input-wrapper label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .file-input-wrapper input {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .instructions h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        #openseadragon-viewer {
+            width: 100%;
+            height: 700px;
+            background: #000;
+            display: none;
+        }
+
+        .viewer-container {
+            padding: 30px;
+        }
+
+        .note {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            color: #856404;
+        }
+
+        .note strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 4px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 DZI Image Viewer</h1>
+            <p>View Deep Zoom Images locally without a server</p>
+        </div>
+
+        <div class="controls">
+            <div class="instructions">
+                <h3>📋 How to Use:</h3>
+                <ol>
+                    <li>Select your <strong>.dzi</strong> file using the file input below</li>
+                    <li>Select the corresponding <strong>_files</strong> folder (the folder containing all the tile images)</li>
+                    <li>Click "Load DZI Image" to view your image</li>
+                </ol>
+            </div>
+
+            <div class="alert" id="alertBox"></div>
+
+            <div class="file-input-wrapper">
+                <label for="dziFile">Select DZI File (.dzi):</label>
+                <input type="file" id="dziFile" accept=".dzi,.xml" />
+            </div>
+
+            <div class="file-input-wrapper">
+                <label for="dziFolder">Select Image Tiles Folder (_files folder):</label>
+                <input type="file" id="dziFolder" webkitdirectory directory multiple />
+            </div>
+
+            <button id="loadButton" onclick="loadDZI()">Load DZI Image</button>
+
+            <div class="note">
+                <strong>⚠️ Important Notes:</strong>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>For best results, open this HTML file directly in your browser (file:// protocol)</li>
+                    <li>Your DZI folder structure should be: yourimage.dzi + yourimage_files/ folder</li>
+                    <li>Modern browsers (Chrome, Edge, Firefox) support local file access without CORS issues</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="viewer-container">
+            <div id="openseadragon-viewer"></div>
+        </div>
+    </div>
+
+    <script>
+        let viewer = null;
+        let dziFileContent = null;
+        let tileFiles = {};
+        let currentTileSource = null; // Track current tile source for cleanup
+
+        // Show alert message
+        function showAlert(message, type = 'info') {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = 'alert ' + type;
+            alertBox.style.display = 'block';
+        }
+
+        // Hide alert message
+        function hideAlert() {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.style.display = 'none';
+        }
+
+        // Read DZI file
+        document.getElementById('dziFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    dziFileContent = await file.text();
+                    showAlert('✓ DZI file loaded successfully', 'success');
+                    console.log('DZI file loaded:', file.name);
+                } catch (error) {
+                    showAlert('Error reading DZI file: ' + error.message, 'error');
+                    console.error('Error reading DZI file:', error);
+                }
+            }
+        });
+
+        // Read tiles folder
+        document.getElementById('dziFolder').addEventListener('change', function(e) {
+            const files = e.target.files;
+            tileFiles = {};
+            
+            if (files.length > 0) {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const path = file.webkitRelativePath || file.name;
+                    tileFiles[path] = file;
+                }
+                showAlert(`✓ Loaded ${files.length} tile files from folder`, 'success');
+                console.log('Tile files loaded:', Object.keys(tileFiles).length);
+            }
+        });
+
+        // Load and display DZI
+        async function loadDZI() {
+            hideAlert();
+
+            // Check if OpenSeadragon is loaded
+            if (typeof OpenSeadragon === 'undefined') {
+                showAlert('OpenSeadragon library is not loaded. Please check your internet connection and refresh the page.', 'error');
+                return;
+            }
+
+            // Custom tile source that loads from File objects
+            class LocalFileTileSource extends OpenSeadragon.TileSource {
+                constructor(dziXml, tileFilesMap, baseFolder) {
+                    super();
+                    this.dziXml = dziXml;
+                    this.tileFilesMap = tileFilesMap;
+                    this.baseFolder = baseFolder;
+                    this.tileUrls = {};
+                    
+                    // Parse DZI XML
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(dziXml, 'text/xml');
+                    
+                    const image = xmlDoc.getElementsByTagName('Image')[0];
+                    const size = xmlDoc.getElementsByTagName('Size')[0];
+                    
+                    this.tileSize = parseInt(image.getAttribute('TileSize')) || 256;
+                    this.tileOverlap = parseInt(image.getAttribute('Overlap')) || 0;
+                    this.format = image.getAttribute('Format') || 'jpg';
+                    
+                    this.width = parseInt(size.getAttribute('Width'));
+                    this.height = parseInt(size.getAttribute('Height'));
+                    
+                    // Calculate max level
+                    this.maxLevel = Math.ceil(Math.log(Math.max(this.width, this.height)) / Math.log(2));
+                }
+
+                getTileUrl(level, x, y) {
+                    // Build the expected path for the tile
+                    // Format: folder_files/level/x_y.format
+                    const tilePath = `${this.baseFolder}_files/${level}/${x}_${y}.${this.format}`;
+                    
+                    // Try different path variations to find the file
+                    let matchingKey = null;
+                    for (let key in this.tileFilesMap) {
+                        if (key.endsWith(`/${level}/${x}_${y}.${this.format}`) || 
+                            key.endsWith(`\\${level}\\${x}_${y}.${this.format}`) ||
+                            key.includes(`${level}/${x}_${y}.${this.format}`) ||
+                            key.includes(`${level}\\${x}_${y}.${this.format}`)) {
+                            matchingKey = key;
+                            break;
+                        }
+                    }
+
+                    if (matchingKey && !this.tileUrls[tilePath]) {
+                        // Create a blob URL for this file
+                        const file = this.tileFilesMap[matchingKey];
+                        this.tileUrls[tilePath] = URL.createObjectURL(file);
+                    }
+
+                    return this.tileUrls[tilePath] || '';
+                }
+
+                configure(data) {
+                    return data;
+                }
+
+                // Cleanup method to revoke blob URLs
+                cleanup() {
+                    for (let url in this.tileUrls) {
+                        URL.revokeObjectURL(this.tileUrls[url]);
+                    }
+                    this.tileUrls = {};
+                }
+            }
+
+            if (!dziFileContent) {
+                showAlert('Please select a DZI file first', 'error');
+                return;
+            }
+
+            if (Object.keys(tileFiles).length === 0) {
+                showAlert('Please select the tiles folder (_files folder)', 'error');
+                return;
+            }
+
+            try {
+                showAlert('Loading DZI image...', 'info');
+
+                // Get the base folder name from the first tile file path
+                const firstTilePath = Object.keys(tileFiles)[0];
+                const pathParts = firstTilePath.split(/[\/\\]/);
+                let baseFolder = pathParts[0];
+                
+                // Remove '_files' suffix if it exists at the end
+                if (baseFolder.endsWith('_files')) {
+                    baseFolder = baseFolder.slice(0, -6); // Remove last 6 characters ('_files')
+                }
+
+                console.log('Base folder:', baseFolder);
+                console.log('Sample tile paths:', Object.keys(tileFiles).slice(0, 5));
+
+                // Create custom tile source
+                const tileSource = new LocalFileTileSource(dziFileContent, tileFiles, baseFolder);
+
+                // Destroy existing viewer and cleanup old tile source if any
+                if (currentTileSource && typeof currentTileSource.cleanup === 'function') {
+                    currentTileSource.cleanup();
+                }
+                if (viewer) {
+                    viewer.destroy();
+                    viewer = null;
+                }
+                
+                // Store the new tile source for future cleanup
+                currentTileSource = tileSource;
+
+                // Show viewer container
+                document.getElementById('openseadragon-viewer').style.display = 'block';
+
+                // Create OpenSeadragon viewer
+                viewer = OpenSeadragon({
+                    id: 'openseadragon-viewer',
+                    prefixUrl: 'https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/images/',
+                    tileSources: tileSource,
+                    showNavigator: true,
+                    navigatorPosition: 'BOTTOM_RIGHT',
+                    showNavigationControl: true,
+                    animationTime: 0.5,
+                    blendTime: 0.1,
+                    constrainDuringPan: true,
+                    maxZoomPixelRatio: 2,
+                    minZoomLevel: 0.5,
+                    visibilityRatio: 1,
+                    zoomPerScroll: 2,
+                    debugMode: false
+                });
+
+                viewer.addHandler('open', function() {
+                    showAlert('✓ DZI image loaded successfully! Use mouse wheel to zoom, drag to pan', 'success');
+                    console.log('Viewer opened successfully');
+                });
+
+                viewer.addHandler('open-failed', function(event) {
+                    showAlert('Failed to open DZI image: ' + (event.message || 'Unknown error'), 'error');
+                    console.error('Viewer open failed:', event);
+                });
+
+                viewer.addHandler('tile-load-failed', function(event) {
+                    console.warn('Tile load failed:', event.tile);
+                });
+
+            } catch (error) {
+                showAlert('Error loading DZI: ' + error.message, 'error');
+                console.error('Error loading DZI:', error);
+            }
+        }
+
+        // Cleanup blob URLs when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (currentTileSource && typeof currentTileSource.cleanup === 'function') {
+                currentTileSource.cleanup();
+            }
+        });
+
+        // Check if OpenSeadragon loaded successfully on page load
+        window.addEventListener('load', function() {
+            if (typeof OpenSeadragon === 'undefined') {
+                showAlert('⚠️ OpenSeadragon library failed to load. Please ensure you have internet connectivity to load the library from CDN.', 'error');
+                document.getElementById('loadButton').disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
