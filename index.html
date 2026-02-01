@@ -4,20 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DZI Viewer - OpenSeadragon</title>
-    <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js" 
-            onerror="handleCDNError()"></script>
-    <script>
-        function handleCDNError() {
-            console.warn('CDN failed to load, trying alternative CDN...');
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js';
-            script.onerror = function() {
-                console.error('All CDNs failed. OpenSeadragon could not be loaded.');
-                alert('Unable to load OpenSeadragon library. Please check your internet connection and try again.');
-            };
-            document.head.appendChild(script);
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -224,6 +211,7 @@
         let viewer = null;
         let dziFileContent = null;
         let tileFiles = {};
+        let currentTileSource = null; // Track current tile source for cleanup
 
         // Show alert message
         function showAlert(message, type = 'info') {
@@ -270,64 +258,6 @@
             }
         });
 
-        // Custom tile source that loads from File objects
-        class LocalFileTileSource extends OpenSeadragon.TileSource {
-            constructor(dziXml, tileFilesMap, baseFolder) {
-                super();
-                this.dziXml = dziXml;
-                this.tileFilesMap = tileFilesMap;
-                this.baseFolder = baseFolder;
-                this.tileUrls = {};
-                
-                // Parse DZI XML
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(dziXml, 'text/xml');
-                
-                const image = xmlDoc.getElementsByTagName('Image')[0];
-                const size = xmlDoc.getElementsByTagName('Size')[0];
-                
-                this.tileSize = parseInt(image.getAttribute('TileSize')) || 256;
-                this.tileOverlap = parseInt(image.getAttribute('Overlap')) || 0;
-                this.format = image.getAttribute('Format') || 'jpg';
-                
-                this.width = parseInt(size.getAttribute('Width'));
-                this.height = parseInt(size.getAttribute('Height'));
-                
-                // Calculate max level
-                this.maxLevel = Math.ceil(Math.log(Math.max(this.width, this.height)) / Math.log(2));
-            }
-
-            getTileUrl(level, x, y) {
-                // Build the expected path for the tile
-                // Format: folder_files/level/x_y.format
-                const tilePath = `${this.baseFolder}_files/${level}/${x}_${y}.${this.format}`;
-                
-                // Try different path variations to find the file
-                let matchingKey = null;
-                for (let key in this.tileFilesMap) {
-                    if (key.endsWith(`/${level}/${x}_${y}.${this.format}`) || 
-                        key.endsWith(`\\${level}\\${x}_${y}.${this.format}`) ||
-                        key.includes(`${level}/${x}_${y}.${this.format}`) ||
-                        key.includes(`${level}\\${x}_${y}.${this.format}`)) {
-                        matchingKey = key;
-                        break;
-                    }
-                }
-
-                if (matchingKey && !this.tileUrls[tilePath]) {
-                    // Create a blob URL for this file
-                    const file = this.tileFilesMap[matchingKey];
-                    this.tileUrls[tilePath] = URL.createObjectURL(file);
-                }
-
-                return this.tileUrls[tilePath] || '';
-            }
-
-            configure(data) {
-                return data;
-            }
-        }
-
         // Load and display DZI
         async function loadDZI() {
             hideAlert();
@@ -336,6 +266,72 @@
             if (typeof OpenSeadragon === 'undefined') {
                 showAlert('OpenSeadragon library is not loaded. Please check your internet connection and refresh the page.', 'error');
                 return;
+            }
+
+            // Custom tile source that loads from File objects
+            class LocalFileTileSource extends OpenSeadragon.TileSource {
+                constructor(dziXml, tileFilesMap, baseFolder) {
+                    super();
+                    this.dziXml = dziXml;
+                    this.tileFilesMap = tileFilesMap;
+                    this.baseFolder = baseFolder;
+                    this.tileUrls = {};
+                    
+                    // Parse DZI XML
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(dziXml, 'text/xml');
+                    
+                    const image = xmlDoc.getElementsByTagName('Image')[0];
+                    const size = xmlDoc.getElementsByTagName('Size')[0];
+                    
+                    this.tileSize = parseInt(image.getAttribute('TileSize')) || 256;
+                    this.tileOverlap = parseInt(image.getAttribute('Overlap')) || 0;
+                    this.format = image.getAttribute('Format') || 'jpg';
+                    
+                    this.width = parseInt(size.getAttribute('Width'));
+                    this.height = parseInt(size.getAttribute('Height'));
+                    
+                    // Calculate max level
+                    this.maxLevel = Math.ceil(Math.log(Math.max(this.width, this.height)) / Math.log(2));
+                }
+
+                getTileUrl(level, x, y) {
+                    // Build the expected path for the tile
+                    // Format: folder_files/level/x_y.format
+                    const tilePath = `${this.baseFolder}_files/${level}/${x}_${y}.${this.format}`;
+                    
+                    // Try different path variations to find the file
+                    let matchingKey = null;
+                    for (let key in this.tileFilesMap) {
+                        if (key.endsWith(`/${level}/${x}_${y}.${this.format}`) || 
+                            key.endsWith(`\\${level}\\${x}_${y}.${this.format}`) ||
+                            key.includes(`${level}/${x}_${y}.${this.format}`) ||
+                            key.includes(`${level}\\${x}_${y}.${this.format}`)) {
+                            matchingKey = key;
+                            break;
+                        }
+                    }
+
+                    if (matchingKey && !this.tileUrls[tilePath]) {
+                        // Create a blob URL for this file
+                        const file = this.tileFilesMap[matchingKey];
+                        this.tileUrls[tilePath] = URL.createObjectURL(file);
+                    }
+
+                    return this.tileUrls[tilePath] || '';
+                }
+
+                configure(data) {
+                    return data;
+                }
+
+                // Cleanup method to revoke blob URLs
+                cleanup() {
+                    for (let url in this.tileUrls) {
+                        URL.revokeObjectURL(this.tileUrls[url]);
+                    }
+                    this.tileUrls = {};
+                }
             }
 
             if (!dziFileContent) {
@@ -354,7 +350,12 @@
                 // Get the base folder name from the first tile file path
                 const firstTilePath = Object.keys(tileFiles)[0];
                 const pathParts = firstTilePath.split(/[\/\\]/);
-                const baseFolder = pathParts[0].replace('_files', '');
+                let baseFolder = pathParts[0];
+                
+                // Remove '_files' suffix if it exists at the end
+                if (baseFolder.endsWith('_files')) {
+                    baseFolder = baseFolder.slice(0, -6); // Remove last 6 characters ('_files')
+                }
 
                 console.log('Base folder:', baseFolder);
                 console.log('Sample tile paths:', Object.keys(tileFiles).slice(0, 5));
@@ -362,11 +363,17 @@
                 // Create custom tile source
                 const tileSource = new LocalFileTileSource(dziFileContent, tileFiles, baseFolder);
 
-                // Destroy existing viewer if any
+                // Destroy existing viewer and cleanup old tile source if any
+                if (currentTileSource && typeof currentTileSource.cleanup === 'function') {
+                    currentTileSource.cleanup();
+                }
                 if (viewer) {
                     viewer.destroy();
                     viewer = null;
                 }
+                
+                // Store the new tile source for future cleanup
+                currentTileSource = tileSource;
 
                 // Show viewer container
                 document.getElementById('openseadragon-viewer').style.display = 'block';
@@ -411,13 +418,8 @@
 
         // Cleanup blob URLs when page unloads
         window.addEventListener('beforeunload', function() {
-            if (viewer && viewer.tileSources && viewer.tileSources[0]) {
-                const tileSource = viewer.tileSources[0];
-                if (tileSource.tileUrls) {
-                    for (let url in tileSource.tileUrls) {
-                        URL.revokeObjectURL(tileSource.tileUrls[url]);
-                    }
-                }
+            if (currentTileSource && typeof currentTileSource.cleanup === 'function') {
+                currentTileSource.cleanup();
             }
         });
 
