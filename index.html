@@ -4,7 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DZI Viewer - OpenSeadragon</title>
-    <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js" 
+            onerror="handleCDNError()"></script>
+    <script>
+        function handleCDNError() {
+            console.warn('CDN failed to load, trying alternative CDN...');
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/openseadragon@4.1.0/build/openseadragon/openseadragon.min.js';
+            script.onerror = function() {
+                console.error('All CDNs failed. OpenSeadragon could not be loaded.');
+                alert('Unable to load OpenSeadragon library. Please check your internet connection and try again.');
+            };
+            document.head.appendChild(script);
+        }
+    </script>
     <style>
         * {
             margin: 0;
@@ -319,6 +332,12 @@
         async function loadDZI() {
             hideAlert();
 
+            // Check if OpenSeadragon is loaded
+            if (typeof OpenSeadragon === 'undefined') {
+                showAlert('OpenSeadragon library is not loaded. Please check your internet connection and refresh the page.', 'error');
+                return;
+            }
+
             if (!dziFileContent) {
                 showAlert('Please select a DZI file first', 'error');
                 return;
@@ -399,6 +418,14 @@
                         URL.revokeObjectURL(tileSource.tileUrls[url]);
                     }
                 }
+            }
+        });
+
+        // Check if OpenSeadragon loaded successfully on page load
+        window.addEventListener('load', function() {
+            if (typeof OpenSeadragon === 'undefined') {
+                showAlert('⚠️ OpenSeadragon library failed to load. Please ensure you have internet connectivity to load the library from CDN.', 'error');
+                document.getElementById('loadButton').disabled = true;
             }
         });
     </script>
