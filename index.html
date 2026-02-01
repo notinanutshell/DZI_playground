@@ -379,6 +379,36 @@
             color: var(--warning);
         }
 
+        /* Help Links */
+        .help-links {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .help-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--surface-light);
+            border-radius: 10px;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .help-link:hover {
+            background: var(--primary);
+            transform: translateX(4px);
+        }
+
+        .help-icon {
+            font-size: 1rem;
+        }
+
         /* Main Viewer Area */
         .main-content {
             display: flex;
@@ -657,6 +687,17 @@
                     <li>Structure: image.dzi + image_files/</li>
                     <li>Use mouse wheel to zoom, drag to pan</li>
                 </ul>
+            </div>
+
+            <div class="help-links">
+                <a href="USAGE.md#creating-dzi-files" class="help-link" target="_blank">
+                    <span class="help-icon">📖</span>
+                    How to convert files to DZI format
+                </a>
+                <a href="USAGE.md#troubleshooting" class="help-link" target="_blank">
+                    <span class="help-icon">🔧</span>
+                    Troubleshooting
+                </a>
             </div>
         </aside>
 
