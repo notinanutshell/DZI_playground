@@ -178,6 +178,7 @@
             inset: 0;
             opacity: 0;
             cursor: pointer;
+            z-index: 10;
         }
 
         .upload-icon {
@@ -191,6 +192,7 @@
             margin: 0 auto 12px;
             font-size: 24px;
             transition: all 0.3s ease;
+            pointer-events: none;
         }
 
         .upload-zone:hover .upload-icon {
@@ -206,11 +208,13 @@
             font-size: 0.875rem;
             font-weight: 600;
             margin-bottom: 4px;
+            pointer-events: none;
         }
 
         .upload-zone p {
             font-size: 0.75rem;
             color: var(--text-muted);
+            pointer-events: none;
         }
 
         .upload-status {
@@ -221,6 +225,7 @@
             display: none;
             align-items: center;
             gap: 8px;
+            pointer-events: none;
         }
 
         .upload-status.loading {
@@ -288,8 +293,46 @@
             cursor: not-allowed;
         }
 
+        .load-button .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
         .load-button .icon {
             font-size: 1.25rem;
+        }
+
+        /* Clear Button */
+        .clear-button {
+            width: 100%;
+            padding: 12px 20px;
+            background: transparent;
+            border: 2px solid var(--surface-light);
+            border-radius: var(--border-radius);
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .clear-button:hover {
+            border-color: var(--error);
+            color: var(--error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .clear-button .icon {
+            font-size: 1rem;
         }
 
         /* Info Card */
@@ -594,9 +637,14 @@
                 </div>
             </div>
 
-            <button class="load-button" id="loadButton" onclick="loadDZI()">
+            <button class="load-button" id="loadButton" onclick="loadDZI()" disabled>
                 <span class="icon">🚀</span>
                 Load DZI Image
+            </button>
+
+            <button class="clear-button" id="clearButton" onclick="clearViewer()" style="display: none;">
+                <span class="icon">🗑️</span>
+                Clear & Load New
             </button>
 
             <div class="info-card">
@@ -640,6 +688,29 @@
         let dziFileContent = null;
         let tileFiles = {};
         let currentTileSource = null;
+
+        // Track upload states
+        let dziFileReady = false;
+        let dziFolderReady = false;
+        let dziFileLoading = false;
+        let dziFolderLoading = false;
+
+        // Update load button state
+        function updateLoadButtonState() {
+            const loadButton = document.getElementById('loadButton');
+            const isLoading = dziFileLoading || dziFolderLoading;
+            const isReady = dziFileReady && dziFolderReady;
+            
+            loadButton.disabled = isLoading || !isReady;
+            
+            if (isLoading) {
+                loadButton.innerHTML = '<div class="spinner"></div><span>Processing...</span>';
+            } else if (isReady) {
+                loadButton.innerHTML = '<span class="icon">🚀</span>Load DZI Image';
+            } else {
+                loadButton.innerHTML = '<span class="icon">🚀</span>Load DZI Image';
+            }
+        }
 
         // Toast notification system
         function showToast(message, type = 'info') {
@@ -718,48 +789,86 @@
         document.getElementById('dziFile').addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (file) {
+                // Reset state immediately and disable button
+                dziFileReady = false;
+                dziFileLoading = true;
+                dziFileContent = null;
+                updateLoadButtonState();
+                
                 try {
                     updateStatus('dziFileStatus', 'loading', 'Reading file...');
                     dziFileContent = await file.text();
                     updateStatus('dziFileStatus', 'success', file.name);
                     updateZoneState('dziFileZone', 'success');
                     
-                    const completedSteps = [1];
-                    if (Object.keys(tileFiles).length > 0) completedSteps.push(2);
-                    updateSteps(completedSteps);
-                    updateStatusBadge();
-                    
+                    dziFileReady = true;
                     console.log('DZI file loaded:', file.name);
                 } catch (error) {
+                    dziFileContent = null;
+                    dziFileReady = false;
                     updateStatus('dziFileStatus', 'error', 'Error: ' + error.message);
                     updateZoneState('dziFileZone', 'error');
                     showToast('Failed to read DZI file', 'error');
+                } finally {
+                    dziFileLoading = false;
+                    updateLoadButtonState();
                 }
+                
+                const completedSteps = [];
+                if (dziFileReady) completedSteps.push(1);
+                if (dziFolderReady) completedSteps.push(2);
+                updateSteps(completedSteps);
+                updateStatusBadge();
             }
         });
 
         // Read tiles folder
         document.getElementById('dziFolder').addEventListener('change', async function(e) {
             const files = e.target.files;
-            tileFiles = {};
             
             if (files.length > 0) {
+                // Reset state immediately and disable button
+                tileFiles = {};
+                dziFolderReady = false;
+                dziFolderLoading = true;
+                updateLoadButtonState();
+                
                 updateStatus('dziFolderStatus', 'loading', `Processing ${files.length} files...`);
                 
+                // Allow UI to update before processing
                 await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                 
-                for (let i = 0; i < files.length; i++) {
-                    const file = files[i];
-                    const path = file.webkitRelativePath || file.name;
-                    tileFiles[path] = file;
+                try {
+                    // Process files in chunks to allow UI updates for large folders
+                    const chunkSize = 1000;
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const path = file.webkitRelativePath || file.name;
+                        tileFiles[path] = file;
+                        
+                        // Update progress for large folders
+                        if (i > 0 && i % chunkSize === 0) {
+                            updateStatus('dziFolderStatus', 'loading', `Processing ${i}/${files.length} files...`);
+                            await new Promise(resolve => requestAnimationFrame(resolve));
+                        }
+                    }
+                    
+                    updateStatus('dziFolderStatus', 'success', `${files.length} tiles loaded`);
+                    updateZoneState('dziFolderZone', 'success');
+                    
+                    dziFolderReady = true;
+                } catch (error) {
+                    updateStatus('dziFolderStatus', 'error', 'Error processing folder');
+                    updateZoneState('dziFolderZone', 'error');
+                    dziFolderReady = false;
+                } finally {
+                    dziFolderLoading = false;
+                    updateLoadButtonState();
                 }
-                
-                updateStatus('dziFolderStatus', 'success', `${files.length} tiles loaded`);
-                updateZoneState('dziFolderZone', 'success');
                 
                 const completedSteps = [];
                 if (dziFileContent) completedSteps.push(1);
-                completedSteps.push(2);
+                if (dziFolderReady) completedSteps.push(2);
                 updateSteps(completedSteps);
                 updateStatusBadge();
                 
@@ -915,6 +1024,9 @@
                     const badge = document.getElementById('statusBadge');
                     badge.textContent = 'Viewing';
                     badge.className = 'badge ready';
+                    
+                    // Show clear button after successful load
+                    document.getElementById('clearButton').style.display = 'flex';
                 });
 
                 viewer.addHandler('open-failed', function(event) {
@@ -930,6 +1042,55 @@
         window.addEventListener('beforeunload', function() {
             if (currentTileSource?.cleanup) currentTileSource.cleanup();
         });
+
+        // Clear viewer and reset for new image
+        function clearViewer() {
+            // Cleanup existing viewer
+            if (currentTileSource?.cleanup) currentTileSource.cleanup();
+            if (viewer) {
+                viewer.destroy();
+                viewer = null;
+            }
+            currentTileSource = null;
+            
+            // Reset file data
+            dziFileContent = null;
+            tileFiles = {};
+            
+            // Reset states
+            dziFileReady = false;
+            dziFolderReady = false;
+            dziFileLoading = false;
+            dziFolderLoading = false;
+            
+            // Reset file inputs
+            document.getElementById('dziFile').value = '';
+            document.getElementById('dziFolder').value = '';
+            
+            // Reset UI states
+            document.getElementById('dziFileStatus').className = 'upload-status';
+            document.getElementById('dziFileStatus').innerHTML = '';
+            document.getElementById('dziFolderStatus').className = 'upload-status';
+            document.getElementById('dziFolderStatus').innerHTML = '';
+            
+            updateZoneState('dziFileZone', null);
+            updateZoneState('dziFolderZone', null);
+            
+            // Reset viewer area
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('openseadragon-viewer').style.display = 'none';
+            document.getElementById('openseadragon-viewer').innerHTML = '';
+            
+            // Reset buttons
+            updateLoadButtonState();
+            document.getElementById('clearButton').style.display = 'none';
+            
+            // Reset steps and badge
+            updateSteps([]);
+            updateStatusBadge();
+            
+            showToast('Viewer cleared. Select new files to continue.', 'info');
+        }
 
         window.addEventListener('load', function() {
             if (typeof OpenSeadragon === 'undefined') {
